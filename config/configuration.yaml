@@ -8,5 +8,6 @@ homeassistant:
 # https://www.home-assistant.io/integrations/logger/
 logger:
   default: info
+
   logs:
     custom_components.home-assistant-avocent-dpdu: debug

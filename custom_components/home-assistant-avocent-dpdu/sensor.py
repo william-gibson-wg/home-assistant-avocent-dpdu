@@ -2,36 +2,45 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from typing import TYPE_CHECKING
 
-from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
-
-from .entity import IntegrationBlueprintEntity
+from homeassistant.components.sensor import (
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import UnitOfElectricCurrent
+from .entity import PowerDistributionUnitCurrentEntity
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from .coordinator import BlueprintDataUpdateCoordinator
-    from .data import IntegrationBlueprintConfigEntry
+    from .coordinator import AvocentDpduDataUpdateCoordinator
+    from .data import AvocentDPDUConfigEntry
+
 
 ENTITY_DESCRIPTIONS = (
     SensorEntityDescription(
         key="home-assistant-avocent-dpdu",
-        name="Integration Sensor",
-        icon="mdi:format-quote-close",
+        name="Combined Current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        suggested_display_precision=1,
+        state_class=SensorStateClass.MEASUREMENT,
     ),
 )
 
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001 Unused function argument: `hass`
-    entry: IntegrationBlueprintConfigEntry,
+    entry: AvocentDPDUConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the sensor platform."""
     async_add_entities(
-        IntegrationBlueprintSensor(
+        AvocentDPDUSensorEntity(
             coordinator=entry.runtime_data.coordinator,
             entity_description=entity_description,
         )
@@ -39,12 +48,12 @@ async def async_setup_entry(
     )
 
 
-class IntegrationBlueprintSensor(IntegrationBlueprintEntity, SensorEntity):
-    """home-assistant-avocent-dpdu Sensor class."""
+class AvocentDPDUSensorEntity(PowerDistributionUnitCurrentEntity, SensorEntity):
+    """Avocent Direct PDU entity reporting overall status."""
 
     def __init__(
         self,
-        coordinator: BlueprintDataUpdateCoordinator,
+        coordinator: AvocentDpduDataUpdateCoordinator,
         entity_description: SensorEntityDescription,
     ) -> None:
         """Initialize the sensor class."""
@@ -52,6 +61,22 @@ class IntegrationBlueprintSensor(IntegrationBlueprintEntity, SensorEntity):
         self.entity_description = entity_description
 
     @property
-    def native_value(self) -> str | None:
-        """Return the native value of the sensor."""
-        return self.coordinator.data.get("body")
+    def should_poll(self) -> bool:
+        """The AvocentDpduDataUpdateCoordinator will handle updates."""
+        return False
+
+    @property
+    def native_value(self) -> Decimal:
+        """Return the current value of the current sensor."""
+        return Decimal(self.coordinator.api.get_current_deciamps()) / 10
+
+    @property
+    def icon(self) -> str:
+        """Return a representative icon."""
+        status = self.coordinator.api.get_pdu_status_integer()
+        icon = "mdi:current-ac"  # Normal icon
+        if status == 1:
+            icon = "mdi:alert"  # Warning: approaching overload
+        elif status == 2:
+            icon = "mdi:electric-switch"  # Overloaded and turned off
+        return icon
