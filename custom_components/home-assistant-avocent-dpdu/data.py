@@ -1,4 +1,4 @@
-"""Custom types for integration_blueprint."""
+"""Custom types for home-assistant-avocent-dpdu."""
 
 from __future__ import annotations
 
